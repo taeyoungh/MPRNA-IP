@@ -22,7 +22,7 @@ mOligoCount <- function(cur.count.table, cur.sample, threshold) {
   return(cur.res)
 }
 
-### Correlation coefficients between two biological repocates 
+### Correlation coefficients between two biological replicates 
 ### for variable barcode numbers
 ### perform n simulations for a given number of barcode numbers
 simCorrLog2FC <- function(repList, bNumList, n) {
@@ -54,7 +54,56 @@ simCorrLog2FC <- function(repList, bNumList, n) {
   return(out)
 }
 
+### QC
+### Correlation coefficients between two biological replicates of rpm
+
+calMeanLog2fc <- function(r, f) {
+  rpm.input <- subset(count.table, pulldown=="Input" & replicate==r)
+  rpm.input <- dcast(rpm.input, tileID~barcodeID, value.var = "rpm")
+  rpm.ip <- subset(count.table, pulldown==f & replicate==r)
+  rpm.ip <- dcast(rpm.ip, tileID~barcodeID, value.var = "rpm")
+  log2fc <- log2(rpm.ip[,-1]+1) - log2(rpm.input[,-1]+1)
+  return(rowMeans(log2fc))
+}
+
 # 2. Enrichment
+
+oligoFilter <- function(cur.oligo.count, inputFilterBy="rpm", inputTh=0, ipFilterBy="rpm", ipTh=0) {
+  cur.oligo.count$oligoID <- paste(cur.oligo.count$tileID, oligo.count$barcodeID, sep="_")
+  
+  # Input filter
+  temp <- subset(cur.oligo.count, pulldown=="Input" & get(inputFilterBy)>=inputTh)
+  temp <- table(temp$oligoID)
+  temp <- names(temp)[temp==REPLICATE_NUM] # oligoIDs should be expressed in all the replicates.
+  #temp <- names(temp)[temp>=2] # oligoIDs should be expressed in at least 2 samples
+  cur.oligo.count <- subset(cur.oligo.count, oligoID %in% temp)
+  
+  # IP filter
+  temp <- subset(cur.oligo.count, pulldown=="IP" & get(ipFilterBy)>=ipTh)
+  temp <- table(temp$oligoID)
+  temp <- names(temp)[temp==REPLICATE_NUM] # oligoIDs should be expressed in all the replicates.
+  #temp <- names(temp)[temp>=2] # oligoIDs should be expressed in at least 2 samples
+  cur.oligo.count <- subset(cur.oligo.count, oligoID %in% temp)
+  
+  cat("Proportion of oligos after filtering: ", length(unique(cur.oligo.count$oligoID))/(nrow(tile.annot)*BARCODE_NUM), "\n")
+  cur.oligo.count$oligoID <- NULL
+  return(cur.oligo.count)
+}
+
+
+countPooler <- function(cur.oligo.count) {
+  cur.oligo.count$sampleID <- paste(cur.oligo.count$repl, cur.oligo.count$pulldown, sep="_")
+  
+  # Pooling
+  oligo.pooled <- dcast(cur.oligo.count, tileID~sampleID, value.var="raw", fun.aggregate = sum)
+  rownames(oligo.pooled) <- oligo.pooled$tileID
+  pooled.count <- data.matrix(oligo.pooled[,-1]) # Output as a matrix 
+  
+  cat("Proportion of tiles after filtering and pooling: ", nrow(pooled.count)/nrow(tile.annot), "\n")
+  return(pooled.count)
+}
+
+
 
 ### GLM
 runGLMtest <- function(BARCODE_LIST, REPLICATE_LIST, IP, INPUT_RPM_TH, IP_COUNT_TH) {
