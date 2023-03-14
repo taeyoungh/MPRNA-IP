@@ -6,4 +6,4 @@ Preprint: https://doi.org/10.1101/2022.06.13.495920
 Analysis codes for MPRNA-IP manuscript
 
 # github_manuscript_updated.md
-Updated for PUM2 and CTCF
+Updated 2023/01/05: edgeR used for PUM2
